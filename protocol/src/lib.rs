@@ -87,3 +87,13 @@ macro_rules! cast {
         $expr.ok_or_else(|| $crate::error::Error::Malformed)
     };
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fuzz() {
+        let _ = get_root::<Block>(&[0x0,0x0,0x0,0x0]);
+    }
+}
