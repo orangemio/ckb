@@ -48,7 +48,7 @@ impl<CS: ChainStore + 'static> PoolRpc for PoolRpcImpl<CS> {
                     .broadcast(NetworkProtocol::RELAY.into(), data);
                 Ok(tx_hash)
             }
-            Err(e) => Err(RPCError::custom(RPCError::Staging, e.to_string())),
+            Err(e) => Err(RPCError::custom(RPCError::Invalid, e.to_string())),
         }
     }
 

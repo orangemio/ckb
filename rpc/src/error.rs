@@ -2,7 +2,7 @@ use jsonrpc_core::{Error, ErrorCode};
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum RPCError {
-    Staging = -2,
+    Invalid = -3,
 }
 
 impl RPCError {
