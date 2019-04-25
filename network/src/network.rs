@@ -171,31 +171,20 @@ impl NetworkState {
         session_id: SessionId,
         timeout: Duration,
     ) {
-        if let Some(peer_id) =
-            self.with_peer_registry(|reg| reg.get_peer(session_id).map(|peer| peer.peer_id.clone()))
+        if let Some(addr) =
+            self.with_peer_registry(|reg| reg.get_peer(session_id).map(|peer| peer.address.clone()))
         {
-            self.ban_peer(p2p_control, &peer_id, timeout);
-        } else {
-            debug!(target: "network", "Ban session({}) failed: not in peer registry", session_id);
-        }
-    }
-
-    pub(crate) fn ban_peer(
-        &self,
-        p2p_control: &ServiceControl,
-        peer_id: &PeerId,
-        timeout: Duration,
-    ) {
-        info!(target: "network", "ban peer {:?} with {:?}", peer_id, timeout);
-        self.peer_store.lock().ban_peer(peer_id, timeout);
-        self.with_peer_registry_mut(|reg| {
-            if let Some(session_id) = reg.get_key_by_peer_id(peer_id) {
+            info!(target: "network", "ban peer {:?} {:?} with {:?}", session_id, addr, timeout);
+            self.peer_store.lock().ban_addr(&addr, timeout);
+            self.with_peer_registry_mut(|reg| {
                 reg.remove_peer(session_id);
                 if let Err(err) = p2p_control.disconnect(session_id) {
                     error!(target: "network", "send message to p2p service error: {:?}", err);
                 }
-            }
-        });
+            });
+        } else {
+            debug!(target: "network", "Ban session({}) failed: not in peer registry", session_id);
+        }
     }
 
     pub(crate) fn query_session_id(&self, peer_id: &PeerId) -> Option<SessionId> {
