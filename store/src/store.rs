@@ -23,6 +23,8 @@ use std::sync::Mutex;
 
 lazy_static! {
     static ref HEADER_CACHE: Mutex<LruCache<H256, Header>> = Mutex::new(LruCache::new(4096));
+    static ref CELL_OUTPUT_CACHE: Mutex<LruCache<(H256, u32), CellOutput>> =
+        Mutex::new(LruCache::new(128));
 }
 
 const META_TIP_HEADER_KEY: &[u8] = b"TIP_HEADER";
@@ -301,8 +303,25 @@ impl<T: KeyValueDB> ChainStore for ChainKVStore<T> {
 
     // TODO build index for cell_output, avoid load the whole tx
     fn get_cell_output(&self, tx_hash: &H256, index: u32) -> Option<CellOutput> {
-        self.get_transaction(tx_hash)
-            .and_then(|(tx, _)| tx.outputs().get(index as usize).map(ToOwned::to_owned))
+        let mut cell_output_cache_unlocked = CELL_OUTPUT_CACHE
+            .lock()
+            .expect("poisoned cell output cache lock");
+        if let Some(cell_output) = cell_output_cache_unlocked.get_refresh(&(tx_hash.clone(), index))
+        {
+            return Some(cell_output.clone());
+        }
+        // release lock asap
+        drop(cell_output_cache_unlocked);
+
+        self.get_transaction(tx_hash).and_then(|(tx, _)| {
+            tx.outputs().get(index as usize).map(|cell_output| {
+                let mut cell_output_cache_unlocked = CELL_OUTPUT_CACHE
+                    .lock()
+                    .expect("poisoned cell output cache lock");
+                cell_output_cache_unlocked.insert((tx_hash.clone(), index), cell_output.clone());
+                cell_output.to_owned()
+            })
+        })
     }
 }
 
