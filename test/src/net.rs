@@ -24,7 +24,6 @@ impl Net {
         num_nodes: usize,
         start_port: u16,
         test_protocols: Vec<TestProtocol>,
-        cellbase_maturity: Option<BlockNumber>,
     ) -> Self {
         let nodes: Vec<Node> = (0..num_nodes)
             .map(|n| {
@@ -37,7 +36,6 @@ impl Net {
                         .unwrap(),
                     start_port + (n * 2 + 1) as u16,
                     start_port + (n * 2 + 2) as u16,
-                    cellbase_maturity,
                 )
             })
             .collect();
@@ -109,7 +107,24 @@ impl Net {
         );
     }
 
-    pub fn waiting_for_sync(&self, timeout: u64) {
+    pub fn connect_all(&self) {
+        self.nodes
+            .windows(2)
+            .for_each(|nodes| nodes[0].connect(&nodes[1]));
+    }
+
+    pub fn disconnect_all(&self) {
+        self.nodes
+            .iter()
+            .zip(self.nodes.iter())
+            .for_each(|(node_a, node_b)| {
+                if node_a.node_id != node_b.node_id {
+                    node_a.disconnect(node_b)
+                }
+            });
+    }
+
+    pub fn waiting_for_sync(&self, timeout: u64) -> BlockNumber {
         for _ in 0..timeout {
             sleep(1);
             let tip_numbers: HashSet<_> = self
@@ -123,7 +138,7 @@ impl Net {
                 })
                 .collect();
             if tip_numbers.len() == 1 {
-                return;
+                return tip_numbers.iter().next().unwrap().parse().unwrap();
             }
         }
         panic!("Waiting for sync timeout");
